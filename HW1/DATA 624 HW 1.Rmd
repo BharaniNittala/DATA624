@@ -1,0 +1,317 @@
+---
+title: "DATA 624 HW1"
+author: "Bharani Nittala"
+date: "February 4, 2023"
+output:
+      html_document:
+        toc: yes
+        toc_float: yes
+        theme: yeti
+        highlight: kate
+        font-family: "Arial"
+        code_folding: hide
+---
+
+This document contains the homework problems for the Data 624 course. 
+Link: https://otexts.com/fpp3/graphics-exercises.html
+
+# Week 1 HW Problems 
+## HA 2.1, 2.2, 2.3, 2.4, 2.5 and 2.8
+
+### 2.1 
+Use the help function to explore what the series gafa_stock, PBS, vic_elec and pelt represent.
+
+* Use autoplot() to plot each of these in separate plots
+ 
+* What is the time interval of each series?
+
+```{r warning=FALSE, message=FALSE}
+if (!require('fpp3')) (install.packages('fpp3'))
+if (!require('magrittr')) (install.packages('magrittr'))
+if (!require('dplyr')) (install.packages('dplyr'))
+if (!require('readxl')) (install.packages('readxl'))
+if (!require('RCurl')) (install.packages('RCurl'))
+```
+
+
+```{r warning=FALSE, message=FALSE}
+library(fpp3)
+library(ggplot2)
+
+#help("gafa_stock")
+#help("PBS")
+#help("vic_elec")
+#help("pelt")
+```
+
+#### gafa_stock
+
+The gafa_stock data represents the Historical stock prices from 2014-2018 for Google, Amazon, Facebook and Apple. All prices are in $USD.
+```{r warning=FALSE, message=FALSE}
+summary(gafa_stock)
+head(gafa_stock)
+
+autoplot(gafa_stock) +
+  ggtitle("Historical stock prices from 2014-2018 (Google, Amazon, Facebook and Apple)") +
+  xlab("Symbol") +
+  ylab("Adj_Close")
+```
+
+What is the time interval of these stocks? 
+```{r warning=FALSE, message=FALSE}
+interval(gafa_stock)
+
+```
+Interval cannot be calculated as it's an irregular dataset. We can see that the date difference can range from 1 day to >1 day for each of the stock symbols
+
+
+#### PBS
+
+The PBS data represents the Monthly Medicare Australia prescription data.
+```{r warning=FALSE, message=FALSE}
+
+head(PBS)
+PBS %>% filter(ATC2 == "A01")%>% autoplot(Cost) +
+  ggtitle("Cost of the scripts in $AUD for 	Anatomical Therapeutic Chemical index (level 2)") 
+
+```
+
+
+What is the time interval of these costs? 
+```{r warning=FALSE, message=FALSE}
+interval(PBS)
+
+```
+
+The time interval of the dataset is at monthly level. 
+
+#### vic_elec
+
+The vic_elec data represents the Half-hourly electricity demand for Victoria, Australia.This data is for operational demand, which is the demand met by local scheduled generating units, semi-scheduled generating units, and non-scheduled intermittent generating units of aggregate capacity larger than 30 MWh, and by generation imports to the region. The operational demand excludes the demand met by non-scheduled non-intermittent generating units, non-scheduled intermittent generating units of aggregate capacity smaller than 30 MWh, exempt generation (e.g. rooftop solar, gas tri-generation, very small wind farms, etc), and demand of local scheduled loads. It also excludes some very large industrial users (such as mines or smelters).
+
+```{r warning=FALSE, message=FALSE}
+summary(vic_elec)
+head(vic_elec)
+
+autoplot(vic_elec) +
+  ggtitle("Half-hourly electricity demand for Victoria, Australia") +
+  xlab("Year") +
+  ylab("Temperature")
+```
+
+What is the time interval of this demand? 
+```{r warning=FALSE, message=FALSE}
+interval(vic_elec)
+
+```
+The time interval is 30 minutes. 
+
+#### pelt
+
+The pelt data represents the Pelt trading records.Hudson Bay Company trading records for Snowshoe Hare and Canadian Lynx furs from 1845 to 1935. This data contains trade records for all areas of the company.
+```{r warning=FALSE, message=FALSE}
+summary(pelt)
+head(pelt)
+
+autoplot(pelt) +
+  ggtitle("The number of Snowshoe Hare pelts vs Canadian Lynx pelts traded)") +
+  xlab("Year") +
+  ylab("Trading records")
+```
+
+What is the time interval of this demand? 
+```{r warning=FALSE, message=FALSE}
+interval(pelt)
+
+```
+
+The time interval of the dataset is 1 year. 
+
+### 2.2 
+
+Use filter() to find what days corresponded to the peak closing price for each of the four stocks in gafa_stock.
+
+#### Filtering the dataset for the stocks available 
+
+```{r message=FALSE, warning=FALSE}
+filter_gafa <- gafa_stock %>% 
+             group_by(Symbol) %>%
+             filter(Close == max(Close)) %>%
+             arrange(desc(Close))
+filter_gafa
+```
+
+Peak closing price for AMZN is with price 2039.51
+Peak closing price for AAPL is with price 232.07
+Peak closing price for FB is with price 217.50
+Peak closing price for GOOG is with price 1268.33
+
+Interesting to see lot changed from then to now!
+
+### 2.3
+
+Download the file tute1.csv from the book website, open it in Excel (or some other spreadsheet application), and review its contents. You should find four columns of information. Columns B through D each contain a quarterly series, labelled Sales, AdBudget and GDP. Sales contains the quarterly sales for a small company over the period 1981-2005. AdBudget is the advertising budget and GDP is the gross domestic product. All series have been adjusted for inflation.
+
+* a) You can read the data into R with the following script:
+
+
+```{r message=FALSE, warning=FALSE}
+tute1 <- read.csv("https://raw.githubusercontent.com/BharaniNittala/DATA624/main/HW1/tute1.csv") 
+head(tute1)
+```
+
+* b) Convert the data to time series
+
+
+```{r message=FALSE, warning=FALSE}
+mytimeseries <- tute1 %>%
+  mutate(Quarter = yearquarter(Quarter)) %>%
+  as_tsibble(index = Quarter)
+
+head(mytimeseries)
+```
+
+* c) Construct time series plots of each of the three series
+Check what happens when you don’t include facet_grid().
+
+```{r message=FALSE, warning=FALSE}
+mytimeseries %>%
+  pivot_longer(-Quarter) %>%
+  ggplot(aes(x = Quarter, y = value, colour = name)) +
+  geom_line() +
+  facet_grid(name ~ ., scales = "free_y")
+
+```
+
+
+```{r message=FALSE, warning=FALSE}
+mytimeseries %>%
+  pivot_longer(-Quarter) %>%
+  ggplot(aes(x = Quarter, y = value, colour = name)) +
+  geom_line() 
+
+```
+
+Each of the time series have range of values. When facet_grid is not included, everything is plotted on one scale. While this makes comparison easy, we may miss out on specific time series learnings. 
+
+### 2.4
+The USgas package contains data on the demand for natural gas in the US.
+
+* a) Install the USgas package.
+
+```{r warning=FALSE, message=FALSE}
+if (!require('USgas')) (install.packages('USgas'))
+library(USgas)
+```
+
+* b) Create a tsibble from us_total with year as the index and state as the key.
+
+```{r warning=FALSE, message=FALSE}
+us_total_new <- us_total
+us_total_new <- us_total_new %>%
+  as_tsibble(index = year, key = state)
+
+head(us_total_new)
+```
+
+* c) Plot the annual natural gas consumption by state for the New England area (comprising the states of Maine, Vermont, New Hampshire, Massachusetts, Connecticut and Rhode Island).
+
+```{r warning=FALSE, message=FALSE}
+newengland_gas <- us_total_new %>%
+  filter(state == 'Maine' |
+           state == 'Vermont' |
+           state == 'New Hampshire' |
+           state == 'Massachusetts' |
+           state == 'Connecticut' |
+           state == 'Rhode Island') %>%
+  mutate(y = y/1000)
+
+head(newengland_gas)
+```
+
+```{r warning=FALSE, message=FALSE}
+autoplot(newengland_gas, y) +
+  labs(title = "The annual natural gas consumption by state",
+       subtitle = "New England Zone",
+       y = "Consumption in thousands")
+```
+
+### 2.5
+
+* a) Download tourism.xlsx from the book website and read it into R using readxl::read_excel().
+
+```{r warning=FALSE, message=FALSE}
+if (!require('readxl')) (install.packages('readxl'))
+library("readxl") # library for read_excel() method
+tourism_xlsx <- readxl::read_excel("C:/Users/nittalab/Documents/Personal/CUNY/DATA 624/HW1/tourism.xlsx")
+head(tourism_xlsx)
+
+
+```
+
+* b) Create a tsibble which is identical to the tourism tsibble from the tsibble package.
+
+```{r warning=FALSE, message=FALSE}
+tourism_xlsx_tb <- tourism_xlsx %>% 
+  mutate(Quarter = yearquarter(Quarter)) %>%
+  as_tsibble(index = Quarter, key = c(Region, State, Purpose)) -> tourism_xlsx
+head(tourism_xlsx_tb)
+
+```
+
+* c) Find what combination of Region and Purpose had the maximum number of overnight trips on average.
+
+```{r warning=FALSE, message=FALSE}
+# summarize average trip length by region and purpose then finds combination with highest
+tourism_xlsx%>%
+  group_by(Region, Purpose)%>%
+  summarize(avg_trip_length = mean(Trips), .groups = "keep")%>%
+  ungroup()%>%
+  filter(avg_trip_length == max(avg_trip_length))
+
+```
+
+* d) Create a new tsibble which combines the Purposes and Regions, and just has total trips by State.
+
+```{r warning=FALSE, message=FALSE}
+# summarize average trip length by region and purpose then finds combination with highest
+t_by_state <- tourism_xlsx_tb %>%
+  group_by(State) %>%
+  summarise(Trips = sum(Trips)) %>%
+  mutate(Quarter = yearquarter(Quarter)) %>%
+  as_tsibble(index = Quarter, key = State)
+
+head(t_by_state)
+
+```
+
+
+### 2.8
+
+Monthly Australian retail data is provided in aus_retail. Select one of the time series as follows (but choose your own seed value):
+
+```{r warning=FALSE, message=FALSE}
+set.seed(12345678)
+myseries <- aus_retail %>%
+  filter(`Series ID` == sample(aus_retail$`Series ID`,1))
+
+```
+
+#### Explore your chosen retail time series using the following functions:
+autoplot(), ggseason(), ggsubseries(), gglag(), ACF() %>% autoplot()
+
+```{r warning=FALSE, message=FALSE}
+autoplot(myseries) + 
+  ggtitle("A3349767W")+
+  xlab("Time") +
+  ylab("Sales");
+
+myseries%>%
+  gg_season(Turnover)+labs(title = "Turnover for Clothing, footwear and personal accessory retailing",
+       subtitle = "Series: A3349767W",
+       y = "Turnover")
+
+```
+
+There appears to be mostly increasing trend with the exception of a slight dip after 2010. The auto plot shows evidence of seasonal changes in the data, evident by the constant fluctuations within each period. We can use the seasonal plot to drill down further.The seasonal plot actually shows a spike in consumer spending between from Nov and December. The slope of each spike increases every year. This could be representative of an increasing consumer culture mindset.  December confirmed to be a major retail month from the charts. 
+
