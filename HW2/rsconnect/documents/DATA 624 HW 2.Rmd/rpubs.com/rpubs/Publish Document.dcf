@@ -1,0 +1,11 @@
+name: Publish Document
+title:
+username:
+account: rpubs
+server: rpubs.com
+hostUrl: rpubs.com
+appId: https://api.rpubs.com/api/v1/document/1002041/4fd176cb51be4f24973fbcb5be6d2060
+bundleId: https://api.rpubs.com/api/v1/document/1002041/4fd176cb51be4f24973fbcb5be6d2060
+url: http://rpubs.com/BharaniMadhav/1002041
+when: 1676256281.50751
+lastSyncTime: 1676256281.50756
