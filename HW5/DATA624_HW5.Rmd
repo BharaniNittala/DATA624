@@ -1,0 +1,492 @@
+---
+title: "DATA 624 HW5"
+author: "Bharani Nittala"
+date: "March 4, 2023"
+output:
+  html_document:
+    toc: yes
+    toc_depth: 3
+    toc_float: yes
+  pdf_document:
+    toc: yes
+    toc_depth: '3'
+---
+
+# Homework 5: Exponential Smoothing
+## Instructions
+Do exercises 8.1, 8.5, 8.6, 8.7, 8.8, 8.9  in [Forecasting: Principles and Practice](https://otexts.com/fpp3/).  Please submit both your Rpubs link as well as attach the .rmd file with your code.
+
+## Packages
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(fpp3)
+library(tidyverse)
+```
+
+## Exercises
+
+### 8.1
+Consider the the number of pigs slaughtered in Victoria, available in the `aus_livestock` dataset.
+
+a. Use the ETS() function to estimate the equivalent model for simple exponential smoothing. Find the optimal values of $\alpha$ and $\ell_0$, and generate forecasts for the next four months. 
+
+```{r}
+head(aus_livestock)
+```
+
+```{r}
+aus_livestock %>%
+  distinct(Animal)
+```
+
+```{r}
+aus_livestock %>%
+  distinct(State)
+```
+
+```{r}
+#filter data and preview it
+vic_pigs <- aus_livestock %>% 
+  filter(State=='Victoria', Animal=='Pigs') %>% 
+  summarise(Count = sum(Count/1e3))
+
+head(vic_pigs)
+
+tail(vic_pigs)
+```
+```{r}
+#model
+fit <- vic_pigs %>%
+  model(ETS(Count ~ error("A") + trend("N") + season("N")))
+fc <- fit %>%
+  forecast(h = 4)
+
+report(fit)
+```
+$\alpha$ = 0.3219  
+$\ell$   = 100.4949
+
+As we can observe below, the simple exponential smoothing function that we applied to model these data follows the original graph one step ahead.
+
+```{r}
+fc %>%
+  autoplot(vic_pigs) +
+  geom_line(aes(y = .fitted), col="#D55E00",
+            data = augment(fit)) +
+  labs(y="Count", title="Number of Pigs in Victoria") +
+  guides(colour = "none")
+```
+
+
+b. Compute a 95% prediction interval for the first forecast using  $\hat{y} \pm 1.96s$ where $s$ is the standard deviation of the residuals. Compare your interval with the interval produced by R.
+
+Multiplier for 95% prediction interval, $c$: 1.96
+
+```{r}
+#four month forecast
+fc <-fit %>% forecast(h = 4)
+
+```
+
+
+Computed 95% prediction interval
+```{r}
+#get the mean
+y_hat <- fc$.mean[1]
+
+#get the residuals
+aug_fit <- augment(fit)
+
+#get standard dev using residuals
+s <- sd(aug_fit$.resid)
+
+# Calculate the 95% prediction intervals
+upper_95 <- y_hat + (s * 1.96)
+lower_95 <- y_hat - (s * 1.96)
+
+
+#lower interval
+lower_95
+
+#upper interval
+upper_95
+
+```
+
+R generated 95% prediction interval
+```{r}
+# Determine the model forecast 95% intervals
+fc_hilo <- fc %>% hilo()
+
+# Output model interval values
+fc_hilo$`95%`[1]
+```
+
+We can see that our results by hand and those of R are off by just a few decimals, thus they are practically identical.
+
+### 8.5
+Data set global_economy contains the annual Exports from many countries. Select one country to analyse.
+
+```{r}
+us_econ <- global_economy %>% 
+  filter(Country == 'United States') 
+
+#sum(is.na(us_econ))
+
+us_econ <- na.omit(us_econ)
+```
+
+
+a. Plot the Exports series and discuss the main features of the data.
+
+```{r message=FALSE, warning=FALSE}
+us_econ %>% autoplot(Exports)+
+  labs(y = "% of GDP", title = "Exports: United States")
+```
+I have picked US for this time series. We can see an upward trend with 2 big dips throughout the years. We can also observe that this trend starts to go down around the year 2004, but it is unclear whether this is another dip as we don't have data past 2017. Thus we can't see if it has gone back up.
+
+b. Use an ETS(A,N,N) model to forecast the series, and plot the forecasts.
+
+```{r}
+# Estimate parameters
+fit <- us_econ %>%
+  model(ETS(Exports ~ error("A") + trend("N") + season("N")))
+
+#create the forecast
+fc <- fit %>%
+  forecast(h = 5)
+```
+
+
+```{r}
+fc %>%
+  autoplot(us_econ) +
+  geom_line(aes(y = .fitted), col="#D55E00",
+            data = augment(fit)) +
+  labs(y="% of GDP", title="Exports: United States") +
+  guides(colour = "none")
+```
+
+
+c. Compute the RMSE values for the training data.
+
+```{r}
+fit %>% accuracy()
+```
+
+
+d. Compare the results to those from an ETS(A,A,N) model. (Remember that the trended model is using one more parameter than the simpler model.) Discuss the merits of the two forecasting methods for this data set.
+
+```{r}
+fit_compare <- us_econ %>%
+  model(
+    ANN = ETS (Exports ~ error("A") + trend("N") + season("N")),
+    AAN = ETS (Exports ~ error("A") + trend("A") + season("N"))
+    )
+accuracy(fit_compare)
+```
+
+
+e. Compare the forecasts from both methods. Which do you think is best?
+
+```{r}
+fit_compare %>% 
+  forecast(h=4) %>% 
+  autoplot(us_econ, level=NULL) +
+  labs(title="Forecast Comparison",
+       subtitle = "United States Exports")
+```
+Using the RMSE to compare the models, the AAN model provides a smaller RMSE value than that of the ANN model suggesting AAN is the better performing model of the two. The AAN performed better by approximately 0.011 over the ANN. 
+
+f. Calculate a 95% prediction interval for the first forecast for each model, using the RMSE values and assuming normal errors. Compare your intervals with those produced using R.
+
+Calculated 95% prediction interval
+```{r}
+#get the mean
+y_hat <- fc$.mean[1]
+
+#get the residuals
+aug_fit <- augment(fit)
+
+#get standard dev using residuals
+s <- sd(aug_fit$.resid)
+
+# Calculate the 95% prediction intervals
+upper_95 <- y_hat + (s * 1.96)
+lower_95 <- y_hat - (s * 1.96)
+
+#lower interval
+lower_95
+
+#upper interval
+upper_95
+```
+
+R generated 95% prediction interval
+```{r}
+# Determine the model forecast 95% intervals
+fc_hilo <- fc %>% hilo()
+
+# Output model interval values
+fc_hilo$`95%`[1]
+```
+
+While the two intervals are similar to the first decimal place (without rounding), they are not identical beyond that. The variance of the residuals generated using R use a more accurate critical value than the 1.96 used in our manual calculation in addition to degrees of freedom being taken into account in the R generated interval.
+
+### 8.6
+Forecast the Chinese GDP from the `global_economy` data set using an ETS model. Experiment with the various options in the `ETS()` function to see how much the forecasts change with damped trend, or with a Box-Cox transformation. Try to develop an intuition of what each is doing to the forecasts.
+
+[Hint: use a relatively large value of `h` when forecasting, so you can clearly see the differences between the various options when plotting the forecasts.]
+
+```{r}
+china <- global_economy %>%
+  filter(Country == "China")
+
+china %>% autoplot(GDP) +
+  labs(title="Chinese GDP")
+```
+
+The Chinese GDP data shows a strong upward trend, with no evidence of a cycle or season. The activity resembles that of exponential growth. GDP is almost stagnant from the year 1960 up until what looks like the mid 1990s and then shows an incredible increase from there on wards with a minor stagnant point around 2015.
+
+Let's take a look at the components of these data:
+
+```{r}
+#STL decomposition
+dcmp <- china %>%
+  model(stl = STL(GDP))
+
+components(dcmp) %>% autoplot()
+```
+
+A Box-Cox transformation may be beneficial in eliminating the non-constant variance shown in the Chinese GDP data.
+
+```{r}
+#obtain optimal lambda for BoxCox transform
+lambda <- china %>%
+  features(GDP, features = guerrero) %>%
+  pull(lambda_guerrero)
+```
+
+
+```{r}
+fit <- china %>% 
+  model(
+    # ETS
+    ETS = ETS(GDP),
+    # Log Transformation
+    `Log` = ETS(log(GDP)),
+    # Damped Model
+    `Damped` = ETS(GDP ~ trend("Ad")),
+    # Box-Cox Transformation
+    `Box-Cox` = ETS(box_cox(GDP, lambda)),
+    # Damped Model w Box-Cox Transformation
+    `Box-Cox, Damped` = ETS(box_cox(GDP, lambda) ~ trend("Ad"))
+)
+
+fit %>%
+  forecast(h="20 years") %>%
+  autoplot(china, level = NULL)+
+  labs(title="20 Year Forecast",
+       subtitle= "Chinese GDP") +
+  guides(colour = guide_legend(title = "Forecast"))
+```
+
+Based on the plot, our Box-Cox and Log transformed forecast appear slightly to over-forecast for the Chinese GDP data. The generic ETS model falls between our damped models which are simple damped model of the ETS, and a Box-Cox with dampening. The dampened forecast plots exhibit slower growth than the transformed forecasts where the transformed forecasts resemble continued exponential growth. 
+
+
+### 8.7
+Find an ETS model for the Gas data from `aus_production` and forecast the next few years. Why is multiplicative seasonality necessary here? Experiment with making the trend damped. Does it improve the forecasts?
+
+```{r}
+aus_production %>% autoplot(Gas)+
+  labs(title="Austrailian Gas Production")
+```
+
+Multiplicative seasonality is needed in this case because there is seasonal variation that increases with time.
+
+```{r}
+fit <- aus_production %>%
+  model(
+    # Multiplicative
+    Multiplicative = ETS(Gas ~ error("M") + trend("A") + season("M")),
+    # Damped multiplicative
+    `Multiplicative, Damped` = ETS(Gas ~ error("M") + trend("Ad") + season("M"))
+  )
+fc <- fit %>% forecast(h = "5 years")
+
+fc %>%
+  autoplot(aus_production, level = NULL) +
+  labs(title="Australian Gas Production") +
+  guides(colour = guide_legend(title = "Forecast"))
+```
+
+```{r message=FALSE, warning=FALSE}
+report(fit)
+```
+
+Based on the AIC values derived from the `report()` of our `fit` as well as our plot, there doesn't seem to be much difference between the damped and un-damped forecast. Both produce about the same results, with very small difference in their AIC values where the un-damped forecast performs slightly better than the damped by 3.09909.
+
+### 8.8
+Recall your retail time series data (from Exercise 8 in Section 2.10).
+
+```{r}
+set.seed(123)
+myseries <- aus_retail %>%
+  filter(`Series ID` == sample(aus_retail$`Series ID`,1))
+```
+
+**a.** Why is multiplicative seasonality necessary for this series?
+
+As observed previously with the data from gas production, we can observe that these data have an increasing trend, seasonality as well as variation. As discussed earlier, the Multiplicative method is preferred when the seasonal variations are changing proportional to the level of the series.
+
+```{r}
+#STL decomposition
+dcmp3 <- myseries %>%
+  model(stl = STL(Turnover))
+
+components(dcmp3) %>% autoplot()
+```
+
+we can also compare below the Multipliatie and Additive methods and conclude that the Multiplicative method is better.
+
+```{r}
+fit5 <- myseries %>%
+  model(
+    "Additive" = ETS(Turnover ~ error('A') + trend('A') + season('A')),
+    "Multiplicative" = ETS(Turnover ~ error('M') + trend('A') + season('M'))
+  )
+
+fc5 <- fit5 %>%
+  forecast(h = 10)
+
+fc5 %>% autoplot(myseries, level = NULL) +
+  labs(title = "Household Goods Turnover") +
+  guides(colour = guide_legend(title = "Forecasts"))
+```
+
+```{r}
+accuracy(fit5)
+```
+
+**b.** Apply Holt-Winters’ multiplicative method to the data. Experiment with making the trend damped.
+
+```{r}
+fit6 <- myseries %>%
+  model(
+    "Holt-Winter" = ETS(Turnover ~ error('M') + trend('Ad') + season('M')),
+    "Damped Holt's Method" = ETS(Turnover ~ error('A') + trend('Ad') + season('M'))
+  )
+
+fc6 <- fit6 %>%
+  forecast(h = 15)
+
+fc6 %>% autoplot(myseries, level = NULL) +
+  labs(title = "Household Goods Turnover") +
+  guides(colour = guide_legend(title = "Forecasts"))
+```
+
+**c.** Compare the RMSE of the one-step forecasts from the two methods. Which do you prefer?
+
+In this case the damped methods seems to be slightly better than the Holt-Winter method, and they both clearly outperform the Multiplicative method in our previous example.
+
+```{r}
+accuracy(fit6)
+```
+
+**d.** Check that the residuals from the best method look like white noise.
+
+It seems that the residuals on the time plot show a slight increase in variability from the year 2000 and on. We can also observe that there is some correlation on the ACF of the residuals but the histogram seems to be close to normal.
+
+```{r}
+best_fit <- myseries %>%
+  model(
+    "Damped Holt's Method" = ETS(Turnover ~ error('A') + trend('Ad') + season('M'))
+  )
+
+best_fc <- best_fit %>%
+  forecast(h = 15)
+
+best_fit %>% gg_tsresiduals()
+```
+
+**e.** Now find the test set RMSE, while training the model to the end of 2010. Can you beat the seasonal naïve approach from Exercise 7 in Section 5.11?
+
+```{r}
+myseries_train <- myseries %>%
+  filter(year(Month) < 2011)
+
+fit_train <- myseries_train %>%
+  model(
+    "SNAIVE" = SNAIVE(Turnover),
+    "Damped Holt's Method" = ETS(Turnover ~ error('A') + trend('Ad') + season('M'))
+  )
+
+fc_train <- fit_train %>%
+  forecast(h = 15)
+
+fc_train %>% autoplot(myseries_train, level = NULL) +
+  labs(title = "Household Goods Turnover") +
+  guides(colour = guide_legend(title = "Forecasts"))
+```
+
+```{r}
+fc_train %>% accuracy(myseries)
+```
+
+We can conclude from the above graph and accuracy metrics that the damped method is superior to the seasonal naive approach.
+
+### 8.9
+For the same retail data, try an STL decomposition applied to the Box-Cox transformed series, followed by ETS on the seasonally adjusted data. How does that compare with your best previous forecasts on the test set?
+
+```{r}
+#lambda for boxcox
+lambda2 <- myseries_train %>%
+  features(Turnover, features = guerrero) %>%
+  pull(lambda_guerrero)
+```
+
+```{r}
+#boxcox transformation
+myseries_train_bx <- myseries_train
+myseries_train_bx$Turnover <- box_cox(myseries_train$Turnover,lambda2)
+```
+
+As we can observe below, the Box-Cox transformation made the seasonality a lot more constant as well as the variability in the remainder.
+
+```{r}
+#STL decomposition
+dcmp4 <- myseries_train_bx %>%
+  model(stl = STL(Turnover))
+
+components(dcmp4) %>% autoplot()
+```
+
+```{r}
+fit_train2 <- myseries_train_bx %>%
+  model(
+    "Damped Holt's Method" = ETS(Turnover ~ error('A') + trend('Ad') + season('M'))
+  )
+
+fc_train2 <- fit_train2 %>%
+  forecast(h = 15)
+
+fc_train2 %>% autoplot(myseries_train_bx, level = NULL) +
+  labs(title = "Household Goods Turnover") +
+  guides(colour = guide_legend(title = "Forecasts"))
+```
+
+```{r}
+accuracy(fit_train)
+accuracy(fit_train2)
+```
+
+According to our accuracy metrics above, it appears that the model improved with the Box-Cox transformation and it now outperforms the best version of our model in the previous exercise. However, I believe we would have to scale the data back to their original form to make a more accurate comparison.
+
+Based on the RMSE values, the Box-Cox STL model is the best performing out of the three with an RMSE of 0.048.
+
+<!------- Below is for removing excessive space in Rmarkdown | HTML formatting -------->
+
+<div class="tocify-extend-page" data-unique="tocify-extend-page" style="height: 0;"></div>
